@@ -48,6 +48,8 @@ DATA train.test;
 	ELSE OUTPUT work.test;
 RUN;
 
+
+
 /* [STEP 4] 결과 확인 - 분할 결과 비율 검증 */
 /* data 검증 > train , test */
 PROC FREQ DATA=train;
@@ -90,3 +92,102 @@ print(df.head())
 endsubmit;
 
 quit;
+
+PROC PYTHON;
+SUBMIT;
+import sys
+import pandas as pd
+import numpy as np
+import sklearn
+print('=' * 50)
+print(f'Python 버전 : {sys.version.split()[0]}')
+print(f'pandas : {pd.__version__}')
+print(f'numpy : {np.__version__}')
+print(f'scikit
+-learn : {sklearn.__version__}')
+print('=' * 50)
+ENDSUBMIT;
+
+/* python에서 vip 숫자와 vip 비율 계산 */
+proc python;
+submit;
+import pandas as pd
+
+# sas macro -> python : SAS.symget
+vip_spent = SAS.symget('vip_spent')
+vip_orders = SAS.symget('CSV_DIR') + 'users.csv'
+df = pd.read_csv(file_path)
+QUIT;
+/* 기대 결과 */
+/* Python 버전 : 3.9.x */
+/* pandas : 1.x.x */
+/* numpy : 1.x.x */
+/* scikit
+-learn : 1.x.x */
+/* 잘 안 될 때에는 버전을 업그레이드 해줘야 함*/
+
+/* SAS 에서 임계값 정의 */
+%LET vip_threshold = 100000; /* VIP 기준 매출 */
+%LET min_age = 18; /* 최소 연령 */
+%let CSV_DIR = /home/student/m6_data;
+/* Python 에서 매크로 변수 사용 */
+
+PROC PYTHON;
+SUBMIT;
+import pandas as pd
+
+# ★ SAS → Python (symget)
+vip_threshold = float(SAS.symget('vip_threshold'))
+min_age = int(SAS.symget('min_age'))
+
+path = SAS.symget('CSV_DIR') + '/users.csv'
+print(f"path : ,{path} ")
+df = pd.read_csv(path)
+#df = pd.read_csv('/home/student/m6_data/users.csv')
+vip = df[(df.age >= min_age) & (df.total_spent >= vip_threshold)]
+vip_count = len(vip)
+vip_pct = vip_count / len(df) * 100
+
+#★ Python → SAS (symput)
+SAS.symput('vip_count', str(vip_count))
+SAS.symput('vip_pct', f'{vip_pct:.2f}')
+ENDSUBMIT;
+QUIT;
+
+/* SAS 에서 Python 결과 사용 */
+%PUT VIP 고객 수: &vip_count;
+%PUT VIP 비율: &vip_pct%;
+
+
+/* STEP 1: SAS 데이터 → CSV */
+PROC EXPORT DATA=shop.users(KEEP=user_id channel age total_spent churn)
+OUTFILE='&CSV_DIR/users_churn.csv' DBMS=CSV REPLACE;
+RUN;
+
+/* STEP 2: Python 으로 채널별 통계 계산 */
+PROC PYTHON;
+SUBMIT;
+import pandas as pd
+
+file_path = SAS.symget('CSV_DIR') + '/users_chrun.csv'
+df = pd.read_csv('file_path')
+
+# 채널별 집계 (회원 수, 평균 매출, 이탈률 작성)
+stats = df.groupby('channel').agg(nusers=('user_id', 'count'),
+avg_spent=('total_spent', 'mean'),
+churn_rate=('churn', 'mean')
+).round(2)
+print(f'stats :{stats}')
+print(stats)
+save_path = SAS.symget('CSV_DIR') + '/churn_stats.csv'
+stats.to_csv(save_path)
+
+
+ENDSUBMIT;
+QUIT;
+
+%put &CSV_DIR;
+proc import datafile = "&CSV_DIR/churn_stats.csv" out=stats dbms=csv replace;
+run;
+proc print data=stats; run;
+
