@@ -49,10 +49,44 @@ DATA train.test;
 RUN;
 
 /* [STEP 4] 결과 확인 - 분할 결과 비율 검증 */
-PROC FREQ DATA=work.train;
+/* data 검증 > train , test */
+PROC FREQ DATA=train;
 TABLES churn / NOCUM;
 RUN;
 
-PROC FREQ DATA=work.test;
+PROC FREQ DATA=test;
 TABLES churn / NOCUM;
 RUN;
+
+proc import data= shop.users
+		outfile = "/home/student/m6_data/users_copy"
+		dbms=csv replace;
+run;
+
+
+proc python;
+submit:
+print("Hello from SAS Python !!")
+print("머신러닝 start")
+
+a = 100
+b = 200
+print(f' {a} + {b} = {a+b}')
+endsubmit;
+quit;
+
+proc python;
+submit;
+# users.csv file read
+# 데이터 관측
+import pandas as pd
+df = pd.read_csv("/home/student/m6_data/users.csv")
+print(f"행수 : {df.shape[0])}, 컬럼수 : {df.shape[1]}, \n 컬럼 목록: {list(df.columns)}")
+
+print()
+# 첫 5행 보기
+print(df.head())
+
+endsubmit;
+
+quit;
